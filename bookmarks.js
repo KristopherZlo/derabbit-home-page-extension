@@ -1,4 +1,78 @@
 let bookmarkFolderId = null;
+const FAVICON_CACHE_KEY = 'faviconCache';
+const FAVICON_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(FAVICON_CACHE_KEY);
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const now = Date.now();
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([, value]) => now - value.ts < FAVICON_TTL)
+    );
+  } catch (e) {
+    return {};
+  }
+}
+
+function saveCache(cache) {
+  try {
+    localStorage.setItem(FAVICON_CACHE_KEY, JSON.stringify(cache));
+  } catch (e) {}
+}
+
+const faviconCache = loadCache();
+
+function getHostname(url) {
+  try {
+    return new URL(url).hostname;
+  } catch (e) {
+    return null;
+  }
+}
+
+function loadFavicon(url, imgEl) {
+  const hostname = getHostname(url);
+  const placeholder = 'https://placehold.co/24x24';
+  if (!hostname) {
+    imgEl.src = placeholder;
+    return;
+  }
+  const cached = faviconCache[hostname];
+  if (cached) {
+    imgEl.src = cached.data;
+  } else {
+    const remoteUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=24`;
+    imgEl.src = remoteUrl; // show immediately from network if available
+    fetch(remoteUrl)
+      .then((res) => res.blob())
+      .then(
+        (blob) =>
+          new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          })
+      )
+      .then((dataUrl) => {
+        if (!dataUrl) return;
+        faviconCache[hostname] = { data: dataUrl, ts: Date.now() };
+        saveCache(faviconCache);
+        imgEl.src = dataUrl;
+      })
+      .catch(() => {
+        // keep the remote URL if fetch fails; fallback only if image errors separately
+        imgEl.addEventListener(
+          'error',
+          () => {
+            imgEl.src = placeholder;
+          },
+          { once: true }
+        );
+      });
+  }
+}
 
 function ensureBookmarkFolder(callback) {
   chrome.bookmarks.search({ title: 'derabbit. | home page' }, (results) => {
@@ -45,18 +119,10 @@ function renderBookmarks() {
         tooltip.textContent = bm.title || bm.url;
         item.appendChild(tooltip);
 
-        try {
-          const urlObj = new URL(bm.url);
-          const img = document.createElement('img');
-          img.src = 'https://www.google.com/s2/favicons?domain=' + urlObj.hostname + '&sz=24';
-          img.alt = bm.title;
-          item.appendChild(img);
-        } catch (e) {
-          const img = document.createElement('img');
-          img.src = 'https://placehold.co/24x24';
-          img.alt = bm.title;
-          item.appendChild(img);
-        }
+        const img = document.createElement('img');
+        img.alt = bm.title;
+        loadFavicon(bm.url, img);
+        item.appendChild(img);
 
         const removeBtn = document.createElement('span');
         removeBtn.className = 'remove-bookmark';
