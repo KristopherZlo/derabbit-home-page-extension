@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Видео при наведении</title>
+  <style>
+    video {
+      width: 640px;
+      height: 360px;
+      display: block;
+      margin: 20px auto;
+      border: 1px solid #ccc;
+    }
+  </style>
+</head>
+<body>
+  <video id="hoverVideo" muted preload="auto" playsinline>
+    <source src="wallpapers/abstract_wood/abstract_wood.mp4" type="video/mp4">
+    Ваш браузер не поддерживает видео.
+  </video>
+  <script>
+    const video = document.getElementById('hoverVideo');
+    let isPlaying = false; // флаг, что видео уже играет
+
+    video.addEventListener('playing', () => {
+      isPlaying = true;
+    });
+
+    video.addEventListener('mouseenter', () => {
+      // Сбрасываем флаг и запускаем видео с начала
+      isPlaying = false;
+      video.currentTime = 0;
+      video.play().catch(e => {
+        if(e.name !== 'AbortError') console.error("Ошибка воспроизведения видео:", e);
+      });
+    });
+
+    video.addEventListener('mouseleave', () => {
+      // Если видео уже запустилось, останавливаем его сразу
+      if (isPlaying) {
+        video.pause();
+        isPlaying = false;
+      } else {
+        // Если событие playing ещё не произошло, ждём немного
+        setTimeout(() => {
+          if (!isPlaying) {
+            video.pause();
+          }
+        }, 200);
+      }
+    });
+  </script>
+</body>
+</html>

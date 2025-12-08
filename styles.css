@@ -1,0 +1,699 @@
+@font-face {
+  font-family: 'Golos Text';
+  src: url('fonts/golos_text/GolosText-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  /* Текст */
+  --text-default: #7b7b7b;
+  --text-light: #ffffff;
+  --text-dark: #333333;
+  --text-active-check: #333333;
+  --text-remove: #ffffff;
+  --text-bookmark-plus: #7b7b7b;
+  --text-white: #fff;
+  --input-text: #7b7b7b;
+
+  /* Фоны */
+  --bg-search: #ffffff;
+  --bg-suggestions: rgba(255, 255, 255, 0.25);
+  --bg-suggestions-hover: rgba(255, 255, 255, 0.35);
+  --bg-suggestions-active: rgba(255, 255, 255, 0.5);
+  --bg-bookmark: rgba(255, 255, 255, 0.25);
+  --bg-modal: rgba(255, 255, 255, 0.25);
+  --bg-modal-input: rgba(255, 255, 255, 0.5);
+  --bg-modal-hover: rgba(255, 255, 255, 0.7);
+  --bg-modal-overlay: rgba(0, 0, 0, 0.15);
+  --bg-tooltip: rgba(0, 0, 0, 0.75);
+  --bg-button-hover: rgba(255, 255, 255, 0.35);
+  --bg-remove: rgba(0, 0, 0, 0.5);
+  --bg-remove-bookmark: rgba(0, 0, 0, 0.6);
+
+  /* Прочее */
+  --icon-color: #989898;
+  --scrollbar-thumb: #989898;
+  --border-modal: rgba(255, 255, 255, 0.18);
+  --box-shadow-modal: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+/* Общие стили */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+html, body {
+  height: 100%;
+}
+body {
+  background: #333;
+  background-size: cover;
+  font-family: 'Golos Text', sans-serif;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+  opacity: 0;
+  transition: opacity 0.35s ease;
+}
+body.is-ready {
+  opacity: 1;
+}
+
+/* Кнопка настроек (справа сверху) */
+.settings-button {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.3s;
+  z-index: 100;
+}
+.settings-button:hover {
+  background: var(--bg-button-hover);
+}
+.settings-button img {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) invert(1);
+}
+
+/* Контейнер страницы */
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transform: translateY(-200px);
+}
+.logo-container {
+  margin-bottom: 40px;
+}
+.logo-container img {
+  height: 196px;
+}
+
+/* Поисковый блок */
+.search-wrapper {
+  position: relative;
+  display: inline-block;
+  width: 614px;
+  transform: translateZ(0);
+}
+.search-input {
+  width: 100%;
+  padding: 12px 50px 12px 22px;
+  border-radius: 16px;
+  border: none;
+  background-color: var(--bg-search);
+  font-size: 16px;
+  color: var(--input-text);
+  outline: none;
+  font-family: inherit;
+  transition: padding-left 0.3s;
+}
+.search-input.with-image {
+  padding-left: 70px;
+}
+.search-input::placeholder {
+  color: var(--input-text);
+}
+.icon-container {
+  position: absolute;
+  top: 50%;
+  right: 18px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  pointer-events: none;
+}
+.icon-container img,
+.icon-container svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* Превью вставленного изображения */
+.pasted-image-preview {
+  position: absolute;
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  padding: 4px;
+  border: none;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.pasted-image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 4px;
+}
+.pasted-image-preview .remove-image {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  background: var(--bg-remove);
+  color: var(--text-remove);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  line-height: 20px;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.pasted-image-preview:hover .remove-image {
+  opacity: 1;
+}
+
+/* Suggestions box */
+.suggestions-box {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  width: 100%;
+  max-height: 442px;
+  background-color: var(--bg-suggestions);
+  backdrop-filter: blur(5px);
+  border-radius: 16px;
+  overflow-y: auto;
+  z-index: 10;
+  text-align: left;
+  transform: translateY(10px);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.suggestions-box.visible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.suggestions-box::-webkit-scrollbar {
+  width: 6px;
+}
+.suggestions-box::-webkit-scrollbar-track {
+  background: var(--bg-suggestions);
+  border-radius: 8px;
+}
+.suggestions-box::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 8px;
+}
+.suggestions-box {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--bg-suggestions);
+}
+.search-tooltip {
+  position: absolute;
+  top: -28px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--text-light);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  z-index: 5;
+}
+.search-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.search-tooltip {
+  position: absolute;
+  top: -28px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.65);
+  color: var(--text-light);
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+  z-index: 5;
+}
+.search-tooltip.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.suggestion-item {
+  padding: 10px 15px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--text-default);
+  white-space: normal;
+  word-break: break-word;
+  transition: background-color 0.3s;
+  display: block;
+}
+.suggestions-section .suggestion-item.site-item {
+  margin: 0 -15px;
+  padding: 10px 15px;
+}
+.suggestions-section .suggestion-item.site-item:hover {
+  background-color: var(--bg-suggestions-hover);
+}
+.suggestion-item.active {
+  background-color: var(--bg-suggestions-active);
+}
+.suggestion-item:hover {
+  background-color: var(--bg-suggestions-hover);
+}
+.suggestions-section {
+  padding: 10px 15px;
+}
+.section-title {
+  font-weight: bold;
+  margin-bottom: 5px;
+  color: var(--text-default);
+}
+.suggestion-item.site-item {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  position: relative;
+}
+.suggestions-box .site-logo {
+  width: 24px;
+  height: 24px;
+  margin-right: 8px;
+  transition: filter 0.3s;
+  filter: none;
+}
+.site-name {
+  flex-grow: 1;
+  color: var(--text-default);
+}
+.remove-btn {
+  font-size: 16px;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+}
+.suggestion-item.site-item:hover .remove-btn {
+  opacity: 1;
+  transform: scale(1.2);
+}
+
+/* Блок закладок */
+.bookmarks-container {
+  position: fixed;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 614px;
+  padding: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 10px;
+  background: none;
+}
+.bookmark-item {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--bg-bookmark);
+  backdrop-filter: blur(5px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s;
+  transform: translateZ(0);
+  will-change: backdrop-filter;
+}
+.bookmark-item:hover {
+  transform: scale(1.05);
+}
+.bookmark-item img {
+  width: 24px;
+  height: 24px;
+  filter: grayscale(100%);
+  transition: filter 0.3s;
+}
+.bookmark-item:hover img {
+  filter: grayscale(0%);
+}
+.bookmark-item .remove-bookmark {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--bg-remove-bookmark);
+  color: var(--text-remove);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  transform: scale(0.6);
+}
+.bookmark-item:hover .remove-bookmark {
+  opacity: 1;
+  transform: scale(0.9);
+}
+.bookmark-item.plus {
+  background: var(--bg-bookmark);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-bookmark-plus);
+}
+.bookmark-item.plus img {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+/* Модальное окно для закладок */
+.bookmark-url-container {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+}
+.bookmark-preview-box {
+  width: 38px;
+  height: 38px;
+  margin-left: 5px;
+  display: none;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 8px;
+  padding: 0;
+  align-items: center;
+  justify-content: center;
+}
+#bookmarkUrl {
+  margin-bottom: 0;
+}
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: none;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 20;
+}
+.modal.active .modal-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+.modal-content {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 70px;
+  background: rgba(255, 255, 255, 0.25);
+  backdrop-filter: blur(10px);
+  padding: 20px;
+  border-radius: 16px;
+  width: 280px;
+  text-align: left;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  transition: transform 0.3s, opacity 0.3s;
+  transform: translateY(20px);
+  opacity: 0;
+}
+.modal-content h2 {
+  margin-bottom: 15px;
+  font-size: 18px;
+  color: var(--text-dark);
+  font-weight: 500;
+}
+.modal-content label {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--text-default);
+  font-size: 13px;
+}
+.modal-content input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.5);
+  backdrop-filter: blur(5px);
+  color: var(--input-text);
+  transition: border-color 0.3s, background 0.3s;
+}
+.modal-content input:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.7);
+}
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.modal-buttons button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 0.2s, background 0.3s;
+  background: rgba(255, 255, 255, 0.3);
+  color: var(--text-dark);
+}
+.modal-buttons button:hover {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.5);
+}
+#saveBookmark {
+  background: rgba(255, 255, 255, 0.5);
+  color: var(--text-dark);
+}
+#saveBookmark:hover {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+/* Модальное окно настроек */
+.settings-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: none;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.settings-modal .modal-content {
+  position: relative;
+  width: 800px;
+  max-width: 90vw;
+  max-height: 90vh;
+  margin: 20px;
+  overflow-y: auto;
+  background: var(--bg-modal);
+  padding: 25px;
+  border-radius: 16px;
+  transform: translateY(20px);
+  opacity: 0;
+  transition: transform 0.3s, opacity 0.3s;
+  border: 1px solid var(--border-modal);
+  box-shadow: var(--box-shadow-modal);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow: hidden auto;
+}
+.settings-modal.active .modal-content {
+  transform: translateY(0);
+  opacity: 1;
+}
+.settings-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.close-modal {
+  position: absolute;
+  top: 25px;
+  right: 25px;
+  cursor: pointer;
+  z-index: 10;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.close-modal img {
+  width: 24px;
+  height: 24px;
+  filter: brightness(0) invert(1);
+}
+
+/* Галерея обоев */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-auto-rows: 160px;
+  gap: 16px;
+  margin-top: 8px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 6px;
+  width: 100%;
+}
+.gallery-grid::-webkit-scrollbar {
+  width: 6px;
+}
+.gallery-grid::-webkit-scrollbar-track {
+  background: var(--bg-suggestions);
+  border-radius: 8px;
+}
+.gallery-grid::-webkit-scrollbar-thumb {
+  background: var(--bg-modal-input);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.gallery-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-modal-hover);
+  background-clip: padding-box;
+}
+.gallery-grid {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bg-modal-input) var(--bg-suggestions);
+}
+.gallery-item {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 140px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: transform 0.3s;
+  isolation: isolate;
+  contain: layout paint;
+  background: rgba(0, 0, 0, 0.08);
+  display: block;
+}
+.gallery-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s;
+}
+.gallery-item video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gallery-item:hover img {
+  transform: scale(1.05);
+}
+.gallery-item.active::after {
+  content: '✓';
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  background: var(--text-light);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-active-check);
+}
+.gallery-item.plus-card {
+  border: 2px dashed var(--text-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gallery-item.plus-card img {
+  filter: invert(1);
+}
+
+/* Дополнительные стили */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-modal-overlay);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease;
+  z-index: 900;
+}
+.modal-overlay.active {
+  opacity: 1;
+  visibility: visible;
+}
+.site-name,
+.suggestions-box .section-title {
+  color: var(--text-default);
+}
+.settings-modal .settings-section h3 {
+  color: var(--text-white)
+}
+.bookmark-item .tooltip {
+  background: var(--bg-tooltip);
+  color: var(--text-light) !important;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  margin-bottom: 11px;
+}
+.bookmark-item:hover .tooltip {
+  opacity: 1;
+}

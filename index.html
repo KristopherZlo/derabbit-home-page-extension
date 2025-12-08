@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>derabbit. | home page</title>
+  <script src="setBackgroundColor.js"></script>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preload" href="icons/rabbit_logo.svg" as="image">
+</head>
+<body>
+  <button class="settings-button" aria-label="Open settings">
+    <img src="icons/settings.svg" alt="Settings">
+  </button>
+  <div class="container">
+    <div class="logo-container">
+      <img src="icons/rabbit_logo.svg" alt="logo" class="glitch-effect" glitch-strength-shift="7">
+    </div>
+    <div class="search-wrapper">
+      <input type="text" class="search-input" placeholder="Type a query or paste an image">
+      <div class="icon-container" id="iconContainer">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#989898" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+      <div class="pasted-image-preview" id="pastedImagePreview" style="display: none;">
+        <img src="" alt="Pasted">
+        <span class="remove-image" id="removePastedImage">x</span>
+      </div>
+      <div class="suggestions-box" id="suggestionsBox"></div>
+    </div>
+  </div>
+  <div class="bookmarks-container" id="bookmarksContainer"></div>
+  <div class="modal" id="bookmarkModal">
+    <div class="modal-content">
+      <h2>Add bookmark</h2>
+      <label for="bookmarkUrl">Link</label>
+      <div class="bookmark-url-container">
+        <input type="text" id="bookmarkUrl" placeholder="https://example.com">
+        <div id="bookmarkPreview" class="bookmark-preview-box">
+          <img src="" alt="Preview">
+        </div>
+      </div>
+      <label for="bookmarkName">Title</label>
+      <input type="text" id="bookmarkName" placeholder="My bookmark">
+      <div class="modal-buttons">
+        <button id="cancelBookmark">Cancel</button>
+        <button id="saveBookmark">Save</button>
+      </div>
+    </div>
+  </div>
+  <div class="modal settings-modal" id="settingsModal">
+    <div class="modal-content settings-content">
+      <button class="close-modal" id="closeSettings"><img src="icons/close-x.svg" alt="Close"></button>
+      <div class="settings-section">
+        <h3>Wallpapers</h3>
+        <div class="gallery-grid" id="galleryGrid"></div>
+        <input type="file" id="wallpaperFile" accept="image/*" style="display:none;">
+      </div>
+    </div>
+  </div>
+  <div class="modal-overlay" id="settingsOverlay"></div>
+  
+  <script type="module" src="main.js"></script>
+  <script src="glitch.js"></script>
+</body>
+</html>

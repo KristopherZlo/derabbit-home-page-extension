@@ -1,0 +1,27 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.idea/
+.vscode/
+
+# Dependencies / builds
+node_modules/
+dist/
+build/
+*.log
+
+# Heavy wallpapers (keep only curated set)
+wallpapers/*
+!wallpapers/
+!wallpapers/abstract_wood/
+!wallpapers/abstract_wood/**
+!wallpapers/richard-horvath-_nWaeTF6qo0-unsplash/
+!wallpapers/richard-horvath-_nWaeTF6qo0-unsplash/**
+!wallpapers/rays/
+!wallpapers/rays/**
+!wallpapers/pawel-czerwinski-009elgvBM_A-unsplash/
+!wallpapers/pawel-czerwinski-009elgvBM_A-unsplash/**
+!wallpapers/own_desk/
+!wallpapers/own_desk/**
