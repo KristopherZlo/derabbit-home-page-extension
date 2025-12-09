@@ -350,6 +350,13 @@ body.is-ready {
   transform: translateZ(0);
   will-change: backdrop-filter;
 }
+.bookmark-item.drop-indicator {
+  border: 2px dashed rgba(255, 255, 255, 0.6);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  filter: none;
+}
 .bookmark-item:hover {
   transform: scale(1.05);
 }

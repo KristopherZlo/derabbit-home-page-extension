@@ -1,6 +1,12 @@
 const REMOVED_FREQUENT_KEY = 'removedFrequent';
 const REMOVED_RECENT_KEY = 'removedRecent';
 const EXPIRATION_TIME = 24 * 60 * 60 * 1000; // 24 hours
+const FALLBACK_ICON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" rx="6" fill="%23c0c0c0"/><circle cx="12" cy="12" r="6" fill="%23888888"/></svg>';
+const FAVICON_SOURCES = [
+  (hostname) => `https://icons.duckduckgo.com/ip3/${hostname}.ico`,
+  (hostname) => `https://www.google.com/s2/favicons?domain=${hostname}&sz=24`
+];
 
 function saveRemovedData(key, data) {
   const payload = {
@@ -29,13 +35,31 @@ function getRemovedData(key) {
 let removedFrequent = getRemovedData(REMOVED_FREQUENT_KEY);
 let removedRecent = getRemovedData(REMOVED_RECENT_KEY);
 
-function getFaviconUrl(url) {
+function setFavicon(img, url) {
+  let hostname;
   try {
-    const domain = new URL(url).hostname;
-    return `https://www.google.com/s2/favicons?domain=${domain}&sz=24`;
+    hostname = new URL(url).hostname;
   } catch (error) {
-    return 'https://placehold.co/24x24';
+    img.src = FALLBACK_ICON;
+    return;
   }
+
+  let index = 0;
+  const tryNext = () => {
+    if (index >= FAVICON_SOURCES.length) {
+      img.src = FALLBACK_ICON;
+      return;
+    }
+    const nextSrc = FAVICON_SOURCES[index++](hostname);
+    img.src = nextSrc;
+  };
+
+  img.onerror = () => {
+    img.onerror = null;
+    tryNext();
+  };
+
+  tryNext();
 }
 
 function truncate(str, n) {
@@ -100,8 +124,8 @@ function renderTopSites(suggestionsBox) {
       const item = document.createElement('div');
       item.className = 'suggestion-item site-item';
       const img = document.createElement('img');
-      img.src = getFaviconUrl(site.url);
       img.alt = site.title || site.url;
+      setFavicon(img, site.url);
       img.className = 'site-logo';
       const nameSpan = document.createElement('span');
       nameSpan.textContent = truncate(site.title || site.url, 65);
@@ -160,8 +184,8 @@ function renderHistory(suggestionsBox) {
       const element = document.createElement('div');
       element.className = 'suggestion-item site-item';
       const img = document.createElement('img');
-      img.src = getFaviconUrl(item.url);
       img.alt = item.title || item.url;
+      setFavicon(img, item.url);
       img.className = 'site-logo';
       const nameSpan = document.createElement('span');
       nameSpan.textContent = truncate(item.title || item.url, 65);
@@ -216,4 +240,4 @@ function initSuggestions() {
   updateEmptySuggestions();
 }
 
-export { updateEmptySuggestions, getFaviconUrl, initSuggestions };
+export { updateEmptySuggestions, initSuggestions };

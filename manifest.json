@@ -11,6 +11,10 @@
     "history",
     "bookmarks"
   ],
+  "host_permissions": [
+    "https://www.google.com/*",
+    "https://icons.duckduckgo.com/*"
+  ],
   "background": {
     "service_worker": "background.js",
     "type": "module"

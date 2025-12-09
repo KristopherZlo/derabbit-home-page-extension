@@ -1,6 +1,16 @@
 let bookmarkFolderId = null;
 const FAVICON_CACHE_KEY = 'faviconCache';
 const FAVICON_TTL = 30 * 24 * 60 * 60 * 1000; // 30 days
+const FALLBACK_FAVICON =
+  'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"><rect width="24" height="24" rx="6" fill="%23c0c0c0"/><circle cx="12" cy="12" r="6" fill="%23888888"/></svg>';
+const FAVICON_SOURCES = [
+  (hostname) => `https://icons.duckduckgo.com/ip3/${hostname}.ico`,
+  (hostname) => `https://www.google.com/s2/favicons?domain=${hostname}&sz=24`
+];
+let draggedBookmarkId = null;
+let dropIndicator = null;
+let dropTargetIndex = null;
+let containerDnDAttached = false;
 
 function loadCache() {
   try {
@@ -9,7 +19,9 @@ function loadCache() {
     const parsed = JSON.parse(raw);
     const now = Date.now();
     return Object.fromEntries(
-      Object.entries(parsed).filter(([, value]) => now - value.ts < FAVICON_TTL)
+      Object.entries(parsed).filter(
+        ([, value]) => value && value.data && now - value.ts < FAVICON_TTL
+      )
     );
   } catch (e) {
     return {};
@@ -24,6 +36,21 @@ function saveCache(cache) {
 
 const faviconCache = loadCache();
 
+function cacheFromImage(hostname, imgEl) {
+  try {
+    const canvas = document.createElement('canvas');
+    canvas.width = 24;
+    canvas.height = 24;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(imgEl, 0, 0, 24, 24);
+    const dataUrl = canvas.toDataURL('image/png');
+    faviconCache[hostname] = { data: dataUrl, ts: Date.now() };
+    saveCache(faviconCache);
+  } catch (e) {
+    // ignore tainted canvas/storage errors
+  }
+}
+
 function getHostname(url) {
   try {
     return new URL(url).hostname;
@@ -32,49 +59,153 @@ function getHostname(url) {
   }
 }
 
+function blobToDataUrl(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function fetchFaviconData(hostname) {
+  for (const source of FAVICON_SOURCES) {
+    const src = source(hostname);
+    try {
+      const response = await fetch(src);
+      if (!response.ok) continue;
+      const blob = await response.blob();
+      if (!blob.size) continue;
+      return await blobToDataUrl(blob);
+    } catch (e) {
+      // Try next source silently
+    }
+  }
+  return null;
+}
+
 function loadFavicon(url, imgEl) {
   const hostname = getHostname(url);
-  const placeholder = 'https://placehold.co/24x24';
+  imgEl.src = FALLBACK_FAVICON;
   if (!hostname) {
-    imgEl.src = placeholder;
     return;
   }
+
   const cached = faviconCache[hostname];
-  if (cached) {
+  if (cached && cached.data) {
     imgEl.src = cached.data;
-  } else {
-    const remoteUrl = `https://www.google.com/s2/favicons?domain=${hostname}&sz=24`;
-    imgEl.src = remoteUrl; // show immediately from network if available
-    fetch(remoteUrl)
-      .then((res) => res.blob())
-      .then(
-        (blob) =>
-          new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          })
-      )
-      .then((dataUrl) => {
-        if (!dataUrl) return;
-        faviconCache[hostname] = { data: dataUrl, ts: Date.now() };
-        saveCache(faviconCache);
-        imgEl.src = dataUrl;
-      })
-      .catch(() => {
-        // keep the remote URL if fetch fails; fallback only if image errors separately
-        imgEl.addEventListener(
-          'error',
-          () => {
-            imgEl.src = placeholder;
-          },
-          { once: true }
-        );
-      });
+    return;
   }
+
+  // show something quickly; errors will fall through to next source/fallback
+  let directIndex = 0;
+  const tryDirect = () => {
+    if (directIndex >= FAVICON_SOURCES.length) {
+      imgEl.src = FALLBACK_FAVICON;
+      return;
+    }
+    imgEl.onerror = () => {
+      directIndex += 1;
+      tryDirect();
+    };
+    imgEl.src = FAVICON_SOURCES[directIndex](hostname);
+  };
+  tryDirect();
+
+  // Also fetch -> cache -> dataURL to survive offline
+  fetchFaviconData(hostname).then((dataUrl) => {
+    if (!dataUrl) return;
+    faviconCache[hostname] = { data: dataUrl, ts: Date.now() };
+    saveCache(faviconCache);
+    imgEl.src = dataUrl;
+  });
+}
+
+function ensureDropIndicator() {
+  if (!dropIndicator) {
+    dropIndicator = document.createElement('div');
+    dropIndicator.className = 'bookmark-item drop-indicator';
+  }
+  return dropIndicator;
+}
+
+function getBookmarkItems(includeIndicator = false) {
+  const items = Array.from(document.querySelectorAll('.bookmark-item'));
+  return items.filter(
+    (el) =>
+      !el.classList.contains('plus') &&
+      (includeIndicator ? true : !el.classList.contains('drop-indicator'))
+  );
+}
+
+function placeDropIndicator(targetIndex) {
+  const bookmarksContainer = document.getElementById('bookmarksContainer');
+  const indicator = ensureDropIndicator();
+  const items = getBookmarkItems();
+  const plus = bookmarksContainer.querySelector('.bookmark-item.plus');
+  const safeIndex = Number.isFinite(targetIndex) ? targetIndex : items.length;
+  const index = Math.max(0, Math.min(safeIndex, items.length));
+  const referenceNode = index >= items.length ? (plus || null) : items[index];
+  bookmarksContainer.insertBefore(indicator, referenceNode);
+  dropTargetIndex = index;
+}
+
+function resolveDropIndex() {
+  const items = getBookmarkItems();
+  const withIndicator = getBookmarkItems(true);
+  const indicatorIndex = withIndicator.findIndex((el) => el.classList.contains('drop-indicator'));
+  if (indicatorIndex !== -1) {
+    return Math.max(0, Math.min(indicatorIndex, items.length));
+  }
+  if (dropTargetIndex === null) return null;
+  return Math.max(0, Math.min(dropTargetIndex, items.length));
+}
+
+function moveDraggedBookmark() {
+  const targetIndex = resolveDropIndex();
+  if (!draggedBookmarkId || targetIndex === null || Number.isNaN(targetIndex)) {
+    clearDragVisuals();
+    return;
+  }
+  const normalizedIndex = Math.max(0, Math.floor(targetIndex));
+  clearDragVisuals();
+  ensureBookmarkFolder((folderId) => {
+    if (!folderId) return;
+    chrome.bookmarks.move(
+      draggedBookmarkId,
+      { parentId: folderId, index: normalizedIndex },
+      () => {
+        renderBookmarks();
+      }
+    );
+  });
+}
+
+function setupContainerDnD() {
+  const bookmarksContainer = document.getElementById('bookmarksContainer');
+  if (!bookmarksContainer || containerDnDAttached) return;
+
+  bookmarksContainer.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    if (!draggedBookmarkId) return;
+    const items = getBookmarkItems();
+    placeDropIndicator(items.length);
+  });
+
+  bookmarksContainer.addEventListener('drop', (e) => {
+    e.preventDefault();
+    moveDraggedBookmark();
+  });
+
+  containerDnDAttached = true;
 }
 
 function ensureBookmarkFolder(callback) {
+  if (bookmarkFolderId) {
+    callback(bookmarkFolderId);
+    return;
+  }
+
   chrome.bookmarks.search({ title: 'derabbit. | home page' }, (results) => {
     const folder = results.find((item) => !item.url && item.title === 'derabbit. | home page');
     if (folder) {
@@ -97,77 +228,88 @@ function loadBookmarks(callback) {
   });
 }
 
+function clearDragVisuals() {
+  dropTargetIndex = null;
+  if (dropIndicator && dropIndicator.parentNode) {
+    dropIndicator.parentNode.removeChild(dropIndicator);
+  }
+}
+
 function renderBookmarks() {
   const bookmarksContainer = document.getElementById('bookmarksContainer');
+  if (!bookmarksContainer) return;
   bookmarksContainer.innerHTML = '';
-
-  const getItemIndex = (targetId) => {
-    const items = Array.from(bookmarksContainer.querySelectorAll('.bookmark-item')).filter(el => !el.classList.contains('plus'));
-    return items.findIndex(el => el.dataset.id === targetId);
-  };
+  clearDragVisuals();
+  setupContainerDnD();
 
   loadBookmarks((children) => {
     children.forEach((bm) => {
-      if (bm.url) {
-        const item = document.createElement('div');
-        item.className = 'bookmark-item';
-        item.dataset.id = bm.id;
-        item.setAttribute('draggable', 'true');
+      if (!bm.url) return;
 
-        const tooltip = document.createElement('span');
-        tooltip.className = 'tooltip';
-        tooltip.textContent = bm.title || bm.url;
-        item.appendChild(tooltip);
+      const item = document.createElement('div');
+      item.className = 'bookmark-item';
+      item.dataset.id = bm.id;
+      item.setAttribute('draggable', 'true');
 
-        const img = document.createElement('img');
-        img.alt = bm.title;
-        loadFavicon(bm.url, img);
-        item.appendChild(img);
+      const tooltip = document.createElement('span');
+      tooltip.className = 'tooltip';
+      tooltip.textContent = bm.title || bm.url;
+      item.appendChild(tooltip);
 
-        const removeBtn = document.createElement('span');
-        removeBtn.className = 'remove-bookmark';
-        removeBtn.textContent = 'x';
-        removeBtn.addEventListener('click', (e) => {
-          e.stopPropagation();
-          removeBookmark(bm.id);
-        });
-        item.appendChild(removeBtn);
+      const img = document.createElement('img');
+      img.alt = bm.title;
+      loadFavicon(bm.url, img);
+      item.appendChild(img);
 
-        item.addEventListener('click', () => {
-          window.location.href = bm.url;
-        });
+      const removeBtn = document.createElement('span');
+      removeBtn.className = 'remove-bookmark';
+      removeBtn.textContent = 'x';
+      removeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        removeBookmark(bm.id);
+      });
+      item.appendChild(removeBtn);
 
-        item.addEventListener('dragstart', (e) => {
-          e.dataTransfer.effectAllowed = 'move';
-          e.dataTransfer.setData('text/plain', bm.id);
-          item.classList.add('dragging');
-        });
-        item.addEventListener('dragend', () => {
-          item.classList.remove('dragging');
-        });
-        item.addEventListener('dragover', (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = 'move';
-          item.classList.add('drag-over');
-        });
-        item.addEventListener('dragleave', () => {
-          item.classList.remove('drag-over');
-        });
-        item.addEventListener('drop', (e) => {
-          e.preventDefault();
-          item.classList.remove('drag-over');
-          const draggedId = e.dataTransfer.getData('text/plain');
-          if (!draggedId || draggedId === bm.id) return;
-          ensureBookmarkFolder((folderId) => {
-            const targetIndex = getItemIndex(bm.id);
-            chrome.bookmarks.move(draggedId, { parentId: folderId, index: targetIndex }, () => {
-              renderBookmarks();
-            });
-          });
-        });
+      item.addEventListener('click', () => {
+        window.location.href = bm.url;
+      });
 
-        bookmarksContainer.appendChild(item);
-      }
+      item.addEventListener('dragstart', (e) => {
+        draggedBookmarkId = bm.id;
+        dropTargetIndex = null;
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', bm.id);
+        item.classList.add('dragging');
+      });
+
+      item.addEventListener('dragend', () => {
+        item.classList.remove('dragging');
+        draggedBookmarkId = null;
+        clearDragVisuals();
+      });
+
+      item.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        if (!draggedBookmarkId) return;
+        const rect = item.getBoundingClientRect();
+        const before = e.clientX < rect.left + rect.width / 2;
+        const items = getBookmarkItems();
+        const currentIndex = items.findIndex((el) => el.dataset.id === bm.id);
+        let targetIndex = before ? currentIndex : currentIndex + 1;
+        const draggedIndex = items.findIndex((el) => el.dataset.id === draggedBookmarkId);
+        if (draggedIndex !== -1 && draggedIndex < targetIndex) {
+          targetIndex -= 1;
+        }
+        placeDropIndicator(targetIndex);
+      });
+
+      item.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        moveDraggedBookmark();
+      });
+
+      bookmarksContainer.appendChild(item);
     });
 
     if (children.length < 8) {
@@ -195,7 +337,6 @@ function positionBookmarkModal(anchor) {
   const modalContent = document.querySelector('#bookmarkModal .modal-content');
   if (!modalContent) return;
 
-  // Reset to defaults
   modalContent.style.left = '';
   modalContent.style.top = '';
   modalContent.style.bottom = '70px';
@@ -254,6 +395,7 @@ function initBookmarks() {
   const bookmarkPreview = document.getElementById('bookmarkPreview');
   const saveBookmarkBtn = document.getElementById('saveBookmark');
   const cancelBookmarkBtn = document.getElementById('cancelBookmark');
+  const previewImg = bookmarkPreview?.querySelector('img');
 
   bookmarkUrlInput.addEventListener('input', () => {
     const url = bookmarkUrlInput.value.trim();
@@ -264,16 +406,22 @@ function initBookmarks() {
       }
       try {
         const urlObj = new URL(fixedUrl);
-        const favicon = 'https://www.google.com/s2/favicons?domain=' + urlObj.hostname + '&sz=24';
+        const previewSrc = FAVICON_SOURCES[0](urlObj.hostname);
         bookmarkPreview.style.display = 'flex';
-        bookmarkPreview.querySelector('img').src = favicon;
+        if (previewImg) {
+          previewImg.src = previewSrc;
+          previewImg.onerror = () => {
+            previewImg.onerror = null;
+            previewImg.src = FALLBACK_FAVICON;
+          };
+        }
       } catch (e) {
         bookmarkPreview.style.display = 'flex';
-        bookmarkPreview.querySelector('img').src = 'https://placehold.co/24x24';
+        if (previewImg) previewImg.src = FALLBACK_FAVICON;
       }
     } else {
       bookmarkPreview.style.display = 'none';
-      bookmarkPreview.querySelector('img').src = '';
+      if (previewImg) previewImg.src = '';
     }
   });
 
