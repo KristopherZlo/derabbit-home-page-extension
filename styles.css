@@ -360,6 +360,10 @@ body.is-ready {
 .bookmark-item:hover {
   transform: scale(1.05);
 }
+.bookmark-item.dragging {
+  opacity: 0.25;
+  visibility: visible;
+}
 .bookmark-item img {
   width: 24px;
   height: 24px;

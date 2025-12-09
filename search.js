@@ -92,13 +92,28 @@ const rusPrefixes = [
 ];
 
 function parseBang(query) {
-  const match = query.match(/^!([a-zA-Z]+)\s*(.*)$/);
-  if (!match) return null;
-  const bang = match[1].toLowerCase();
-  const rest = match[2] || '';
+  const trimmed = (query || '').trim();
+  if (!trimmed) return null;
+
+  let bang = null;
+  let rest = trimmed;
+
+  const startMatch = trimmed.match(/^!\s*([^\s]+)\s*(.*)$/);
+  if (startMatch) {
+    bang = startMatch[1].toLowerCase();
+    rest = startMatch[2];
+  } else {
+    const endMatch = trimmed.match(/^(.*)\s+!\s*([^\s]+)$/);
+    if (endMatch) {
+      bang = endMatch[2].toLowerCase();
+      rest = endMatch[1];
+    }
+  }
+
+  if (!bang) return null;
   const system = bangMappings[bang];
   if (!system) return null;
-  return { system, rest };
+  return { system, rest: rest.trim() };
 }
 
 function normalize(text) {
@@ -140,7 +155,8 @@ function chooseSystemByConditions(query) {
 }
 
 function orderSystems(query) {
-  const bang = parseBang(query);
+  const trimmed = (query || '').trim();
+  const bang = parseBang(trimmed);
   if (bang) {
     const selected = systems.find((s) => s.name === bang.system) || systems[0];
     const rest = systems.filter((s) => s.name !== selected.name);
@@ -149,7 +165,7 @@ function orderSystems(query) {
     return;
   }
 
-  const normalized = normalize(query);
+  const normalized = normalize(trimmed);
   const prefixHit = rusPrefixes.find(({ prefix }) => normalized.startsWith(prefix));
   if (prefixHit) {
     const selected = systems.find((s) => s.name === prefixHit.system) || systems[0];
@@ -164,7 +180,7 @@ function orderSystems(query) {
     state.currentIndex = 0;
     return;
   }
-  const selected = chooseSystemByConditions(query);
+  const selected = chooseSystemByConditions(trimmed);
   if (selected.name === imageSearchOption.name) {
     state.orderedSystems = [imageSearchOption, ...systems];
   } else {
@@ -325,15 +341,11 @@ function useSystemAndSearch() {
   const parsedBang = parseBang(query);
   if (parsedBang) {
     query = parsedBang.rest.trim();
-    const bangIndex = state.orderedSystems.findIndex((s) => s.name === parsedBang.system);
-    if (bangIndex >= 0) {
-      state.currentIndex = bangIndex;
-    } else {
-      const fallback = systems.find((s) => s.name === parsedBang.system);
-      if (fallback) {
-        orderSystems(query);
-        state.currentIndex = 0;
-      }
+    const selected = systems.find((s) => s.name === parsedBang.system);
+    if (selected) {
+      const rest = systems.filter((s) => s.name !== selected.name);
+      state.orderedSystems = [selected, ...rest, imageSearchOption];
+      state.currentIndex = 0;
     }
   }
 

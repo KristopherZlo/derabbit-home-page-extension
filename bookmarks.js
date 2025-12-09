@@ -150,6 +150,25 @@ function placeDropIndicator(targetIndex) {
   dropTargetIndex = index;
 }
 
+function computeTargetIndex(clientX) {
+  const items = getBookmarkItems();
+  if (!items.length) return 0;
+  for (let i = 0; i < items.length; i++) {
+    const rect = items[i].getBoundingClientRect();
+    const middle = rect.left + rect.width / 2;
+    if (clientX < middle) {
+      return i;
+    }
+  }
+  return items.length;
+}
+
+function updateIndicatorFromEvent(e) {
+  const x = e.clientX;
+  const targetIndex = computeTargetIndex(x);
+  placeDropIndicator(targetIndex);
+}
+
 function resolveDropIndex() {
   const items = getBookmarkItems();
   const withIndicator = getBookmarkItems(true);
@@ -188,8 +207,7 @@ function setupContainerDnD() {
   bookmarksContainer.addEventListener('dragover', (e) => {
     e.preventDefault();
     if (!draggedBookmarkId) return;
-    const items = getBookmarkItems();
-    placeDropIndicator(items.length);
+    updateIndicatorFromEvent(e);
   });
 
   bookmarksContainer.addEventListener('drop', (e) => {
@@ -279,6 +297,11 @@ function renderBookmarks() {
         dropTargetIndex = null;
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', bm.id);
+        const items = getBookmarkItems();
+        const currentIndex = items.findIndex((el) => el.dataset.id === bm.id);
+        if (currentIndex >= 0) {
+          placeDropIndicator(currentIndex);
+        }
         item.classList.add('dragging');
       });
 
@@ -290,17 +313,10 @@ function renderBookmarks() {
 
       item.addEventListener('dragover', (e) => {
         e.preventDefault();
+        e.stopPropagation();
         if (!draggedBookmarkId) return;
-        const rect = item.getBoundingClientRect();
-        const before = e.clientX < rect.left + rect.width / 2;
-        const items = getBookmarkItems();
-        const currentIndex = items.findIndex((el) => el.dataset.id === bm.id);
-        let targetIndex = before ? currentIndex : currentIndex + 1;
-        const draggedIndex = items.findIndex((el) => el.dataset.id === draggedBookmarkId);
-        if (draggedIndex !== -1 && draggedIndex < targetIndex) {
-          targetIndex -= 1;
-        }
-        placeDropIndicator(targetIndex);
+        e.dataTransfer.dropEffect = 'move';
+        updateIndicatorFromEvent(e);
       });
 
       item.addEventListener('drop', (e) => {
