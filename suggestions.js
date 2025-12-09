@@ -144,7 +144,7 @@ function renderTopSites(suggestionsBox) {
       item.appendChild(nameSpan);
       item.appendChild(removeBtn);
       item.addEventListener('click', () => {
-        window.open(site.url, '_blank');
+        window.location.href = site.url;
       });
       frequentSection.appendChild(item);
     });
@@ -201,7 +201,7 @@ function renderHistory(suggestionsBox) {
       element.appendChild(nameSpan);
       element.appendChild(removeBtn);
       element.addEventListener('click', () => {
-        window.open(item.url, '_blank');
+        window.location.href = item.url;
       });
       recentSection.appendChild(element);
     });
