@@ -129,13 +129,15 @@ function ensureDropIndicator() {
   return dropIndicator;
 }
 
-function getBookmarkItems(includeIndicator = false) {
+function getBookmarkItems(options = {}) {
+  const { includeIndicator = false, includeDragging = false } = options;
   const items = Array.from(document.querySelectorAll('.bookmark-item'));
-  return items.filter(
-    (el) =>
-      !el.classList.contains('plus') &&
-      (includeIndicator ? true : !el.classList.contains('drop-indicator'))
-  );
+  return items.filter((el) => {
+    if (el.classList.contains('plus')) return false;
+    if (!includeDragging && el.classList.contains('dragging')) return false;
+    if (!includeIndicator && el.classList.contains('drop-indicator')) return false;
+    return true;
+  });
 }
 
 function placeDropIndicator(targetIndex) {
@@ -151,7 +153,7 @@ function placeDropIndicator(targetIndex) {
 }
 
 function computeTargetIndex(clientX) {
-  const items = getBookmarkItems();
+  const items = getBookmarkItems({ includeDragging: true });
   if (!items.length) return 0;
   for (let i = 0; i < items.length; i++) {
     const rect = items[i].getBoundingClientRect();
@@ -170,13 +172,18 @@ function updateIndicatorFromEvent(e) {
 }
 
 function resolveDropIndex() {
-  const items = getBookmarkItems();
-  const withIndicator = getBookmarkItems(true);
-  const indicatorIndex = withIndicator.findIndex((el) => el.classList.contains('drop-indicator'));
+  const list = getBookmarkItems({ includeIndicator: true, includeDragging: true });
+  const indicatorIndex = list.findIndex((el) => el.classList.contains('drop-indicator'));
   if (indicatorIndex !== -1) {
-    return Math.max(0, Math.min(indicatorIndex, items.length));
+    const draggedIndex = list.findIndex((el) => el.dataset.id === draggedBookmarkId);
+    let targetIndex = indicatorIndex;
+    if (draggedIndex !== -1 && draggedIndex < indicatorIndex) {
+      targetIndex -= 1;
+    }
+    return Math.max(0, targetIndex);
   }
   if (dropTargetIndex === null) return null;
+  const items = getBookmarkItems({ includeDragging: true });
   return Math.max(0, Math.min(dropTargetIndex, items.length));
 }
 
@@ -203,19 +210,6 @@ function moveDraggedBookmark() {
 function setupContainerDnD() {
   const bookmarksContainer = document.getElementById('bookmarksContainer');
   if (!bookmarksContainer || containerDnDAttached) return;
-
-  bookmarksContainer.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    if (!draggedBookmarkId) return;
-    updateIndicatorFromEvent(e);
-  });
-
-  bookmarksContainer.addEventListener('drop', (e) => {
-    e.preventDefault();
-    moveDraggedBookmark();
-  });
-
-  containerDnDAttached = true;
 }
 
 function ensureBookmarkFolder(callback) {
@@ -258,7 +252,7 @@ function renderBookmarks() {
   if (!bookmarksContainer) return;
   bookmarksContainer.innerHTML = '';
   clearDragVisuals();
-  setupContainerDnD();
+  // DnD removed
 
   loadBookmarks((children) => {
     children.forEach((bm) => {
@@ -267,7 +261,6 @@ function renderBookmarks() {
       const item = document.createElement('div');
       item.className = 'bookmark-item';
       item.dataset.id = bm.id;
-      item.setAttribute('draggable', 'true');
 
       const tooltip = document.createElement('span');
       tooltip.className = 'tooltip';
@@ -290,39 +283,6 @@ function renderBookmarks() {
 
       item.addEventListener('click', () => {
         window.location.href = bm.url;
-      });
-
-      item.addEventListener('dragstart', (e) => {
-        draggedBookmarkId = bm.id;
-        dropTargetIndex = null;
-        e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', bm.id);
-        const items = getBookmarkItems();
-        const currentIndex = items.findIndex((el) => el.dataset.id === bm.id);
-        if (currentIndex >= 0) {
-          placeDropIndicator(currentIndex);
-        }
-        item.classList.add('dragging');
-      });
-
-      item.addEventListener('dragend', () => {
-        item.classList.remove('dragging');
-        draggedBookmarkId = null;
-        clearDragVisuals();
-      });
-
-      item.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!draggedBookmarkId) return;
-        e.dataTransfer.dropEffect = 'move';
-        updateIndicatorFromEvent(e);
-      });
-
-      item.addEventListener('drop', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        moveDraggedBookmark();
       });
 
       bookmarksContainer.appendChild(item);
